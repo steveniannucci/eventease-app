@@ -1,0 +1,22 @@
+@page "/events/details/{id:int}"
+@page "/events/details"
+@inject NavigationManager Nav
+
+@if (Id > 0)
+{
+    <h1>Event Details</h1>
+    <p>Event ID: @Id</p>
+    <p>This is where detailed information about the event would be displayed.</p>
+    <NavLink href="/events" class="btn btn-secondary">← Back to Events</NavLink>
+}
+else
+{
+    <h1>Event Details</h1>
+    <p>Please select an event from the events list to view details.</p>
+    <NavLink href="/events" class="btn btn-primary">Go to Events</NavLink>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+}

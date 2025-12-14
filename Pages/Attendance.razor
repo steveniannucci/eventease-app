@@ -1,0 +1,292 @@
+@page "/attendance"
+@page "/attendance/{EventId:int}"
+@using EventEaseApp.Services
+@inject AttendanceTracker Tracker
+@inject UserSessionTracker Session
+@implements IDisposable
+
+<h1>Event Attendance Tracker</h1>
+
+@if (EventId.HasValue && selectedEvent != null)
+{
+    <div class="mb-3">
+        <button class="btn btn-secondary" @onclick="() => EventId = null">← Back to All Events</button>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h3>@selectedEvent.EventName</h3>
+            <p><strong>Date:</strong> @selectedEvent.EventDate.ToString("MMM dd, yyyy")</p>
+            <p><strong>Capacity:</strong> @selectedEvent.Capacity</p>
+            <p><strong>Available Spots:</strong> @selectedEvent.AvailableSpots</p>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">@selectedEvent.RegisteredCount</h5>
+                    <p class="card-text">Registered</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">@selectedEvent.CheckedInCount</h5>
+                    <p class="card-text">Checked In</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center bg-warning">
+                <div class="card-body">
+                    <h5 class="card-title">@selectedEvent.WaitlistCount</h5>
+                    <p class="card-text">Waitlisted</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">@selectedEvent.AttendanceRate.ToString("F1")%</h5>
+                    <p class="card-text">Attendance Rate</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">
+            <h5>Quick Actions</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <input @bind="newUserId" class="form-control mb-2" placeholder="User ID" />
+                </div>
+                <div class="col-md-4">
+                    <input @bind="newUserName" class="form-control mb-2" placeholder="Name" />
+                </div>
+                <div class="col-md-4">
+                    <input @bind="newUserEmail" class="form-control mb-2" placeholder="Email" />
+                </div>
+            </div>
+            <button class="btn btn-primary" @onclick="RegisterNewAttendee">Register Attendee</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5>Attendee List</h5>
+            <select class="form-select form-select-sm w-auto" @bind="filterStatus">
+                <option value="">All</option>
+                <option value="Registered">Registered</option>
+                <option value="CheckedIn">Checked In</option>
+                <option value="NoShow">No Show</option>
+                <option value="Cancelled">Cancelled</option>
+                <option value="Waitlisted">Waitlisted</option>
+            </select>
+        </div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Status</th>
+                        <th>Registered</th>
+                        <th>Check-In Time</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var attendee in filteredAttendees)
+                    {
+                        <tr>
+                            <td>@attendee.UserName</td>
+                            <td>@attendee.Email</td>
+                            <td>
+                                <span class="badge @GetStatusBadgeClass(attendee.Status)">
+                                    @attendee.Status
+                                </span>
+                            </td>
+                            <td>@attendee.RegistrationDate.ToString("MMM dd, HH:mm")</td>
+                            <td>@(attendee.CheckInTime?.ToString("MMM dd, HH:mm") ?? "-")</td>
+                            <td>
+                                @if (attendee.Status == AttendanceTracker.AttendanceStatus.Registered)
+                                {
+                                    <button class="btn btn-sm btn-success" @onclick="() => CheckIn(attendee.UserId)">Check In</button>
+                                }
+                                @if (attendee.Status != AttendanceTracker.AttendanceStatus.Cancelled)
+                                {
+                                    <button class="btn btn-sm btn-danger" @onclick="() => Cancel(attendee.UserId)">Cancel</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header">
+            <h5>All Events</h5>
+        </div>
+        <div class="card-body">
+            @if (!allEvents.Any())
+            {
+                <p class="text-muted">No events found. Create some sample data:</p>
+                <button class="btn btn-primary" @onclick="CreateSampleData">Create Sample Events</button>
+            }
+            else
+            {
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Event Name</th>
+                            <th>Date</th>
+                            <th>Registered</th>
+                            <th>Checked In</th>
+                            <th>Capacity</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var evt in allEvents)
+                        {
+                            <tr>
+                                <td>@evt.EventName</td>
+                                <td>@evt.EventDate.ToString("MMM dd, yyyy")</td>
+                                <td>@evt.RegisteredCount</td>
+                                <td>@evt.CheckedInCount</td>
+                                <td>@evt.Capacity</td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary" @onclick="() => EventId = evt.EventId">View Details</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int? EventId { get; set; }
+
+    private AttendanceTracker.EventAttendance? selectedEvent;
+    private List<AttendanceTracker.EventAttendance> allEvents = new();
+    private List<AttendanceTracker.AttendeeRecord> filteredAttendees = new();
+    private string filterStatus = "";
+    private string newUserId = "";
+    private string newUserName = "";
+    private string newUserEmail = "";
+
+    protected override void OnInitialized()
+    {
+        Tracker.OnAttendanceChanged += OnAttendanceChanged;
+        LoadData();
+    }
+
+    protected override void OnParametersSet()
+    {
+        LoadData();
+    }
+
+    private void LoadData()
+    {
+        allEvents = Tracker.GetAllEvents().ToList();
+
+        if (EventId.HasValue)
+        {
+            selectedEvent = Tracker.GetEventAttendance(EventId.Value);
+            UpdateFilteredAttendees();
+        }
+    }
+
+    private void UpdateFilteredAttendees()
+    {
+        if (!EventId.HasValue) return;
+
+        AttendanceTracker.AttendanceStatus? status = null;
+        if (!string.IsNullOrEmpty(filterStatus))
+        {
+            Enum.TryParse<AttendanceTracker.AttendanceStatus>(filterStatus, out var parsedStatus);
+            status = parsedStatus;
+        }
+
+        filteredAttendees = Tracker.GetAttendees(EventId.Value, status).ToList();
+    }
+
+    private void OnAttendanceChanged()
+    {
+        LoadData();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void RegisterNewAttendee()
+    {
+        if (EventId.HasValue && !string.IsNullOrWhiteSpace(newUserId))
+        {
+            Tracker.RegisterAttendee(EventId.Value, newUserId, newUserName, newUserEmail);
+            newUserId = "";
+            newUserName = "";
+            newUserEmail = "";
+        }
+    }
+
+    private void CheckIn(string userId)
+    {
+        if (EventId.HasValue)
+        {
+            Tracker.CheckInAttendee(EventId.Value, userId);
+        }
+    }
+
+    private void Cancel(string userId)
+    {
+        if (EventId.HasValue)
+        {
+            Tracker.CancelRegistration(EventId.Value, userId);
+        }
+    }
+
+    private string GetStatusBadgeClass(AttendanceTracker.AttendanceStatus status)
+    {
+        return status switch
+        {
+            AttendanceTracker.AttendanceStatus.Registered => "bg-primary",
+            AttendanceTracker.AttendanceStatus.CheckedIn => "bg-success",
+            AttendanceTracker.AttendanceStatus.NoShow => "bg-danger",
+            AttendanceTracker.AttendanceStatus.Cancelled => "bg-secondary",
+            AttendanceTracker.AttendanceStatus.Waitlisted => "bg-warning",
+            _ => "bg-light"
+        };
+    }
+
+    private void CreateSampleData()
+    {
+        Tracker.CreateEvent(1, "Tech Conference 2025", DateTime.Today.AddDays(7), 50);
+        Tracker.CreateEvent(2, "Workshop: Blazor Basics", DateTime.Today.AddDays(14), 30);
+        Tracker.CreateEvent(3, "Networking Mixer", DateTime.Today.AddDays(21), 100);
+
+        // Add sample attendees
+        Tracker.RegisterAttendee(1, "user1", "Alice Smith", "alice@example.com");
+        Tracker.RegisterAttendee(1, "user2", "Bob Johnson", "bob@example.com");
+        Tracker.RegisterAttendee(1, "user3", "Carol White", "carol@example.com");
+        Tracker.CheckInAttendee(1, "user1");
+        Tracker.CheckInAttendee(1, "user2");
+    }
+
+    public void Dispose()
+    {
+        Tracker.OnAttendanceChanged -= OnAttendanceChanged;
+    }
+}

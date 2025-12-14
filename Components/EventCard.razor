@@ -1,0 +1,127 @@
+@using System.ComponentModel.DataAnnotations
+
+<EditForm Model="model" EditContext="editContext" OnValidSubmit="HandleValidSubmit" OnInvalidSubmit="HandleInvalidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">@model.EventName</h5>
+            <p class="card-text">
+                <strong>Date:</strong> @model.EventDate?.ToString("MMM dd, yyyy")
+            </p>
+            <p class="card-text">
+                <strong>Location:</strong> @model.Location
+            </p>
+
+            <div class="form-section">
+                <label class="form-label" for="event-name">Event Name</label>
+                <InputText id="event-name" class="form-control" @bind-Value="model.EventName" />
+                <ValidationMessage For="() => model.EventName" />
+
+                <label class="form-label" for="event-date">Event Date</label>
+                <InputDate id="event-date" class="form-control" @bind-Value="model.EventDate" />
+                <ValidationMessage For="() => model.EventDate" />
+
+                <label class="form-label" for="event-location">Location</label>
+                <InputText id="event-location" class="form-control" @bind-Value="model.Location" />
+                <ValidationMessage For="() => model.Location" />
+
+                <button type="submit" class="btn btn-primary mt-3" disabled="@isSubmitting">Save</button>
+            </div>
+        </div>
+    </div>
+</EditForm>
+
+@code {
+    public class EventModel : IValidatableObject
+    {
+        [Required(ErrorMessage = "Event name is required")]
+        [StringLength(100, MinimumLength = 2, ErrorMessage = "Name must be 2-100 chars")]
+        public string EventName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Date is required")]
+        [DataType(DataType.Date)]
+        public DateTime? EventDate { get; set; }
+
+        [Required(ErrorMessage = "Location is required")]
+        [StringLength(100, MinimumLength = 2, ErrorMessage = "Location must be 2-100 chars")]
+        public string Location { get; set; } = string.Empty;
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            var results = new List<ValidationResult>();
+
+            if (!string.IsNullOrWhiteSpace(EventName)) EventName = EventName.Trim();
+            if (!string.IsNullOrWhiteSpace(Location)) Location = Location.Trim();
+
+            if (EventDate.HasValue)
+            {
+                var d = EventDate.Value.Date;
+                if (d < DateTime.Today)
+                {
+                    results.Add(new ValidationResult("Date cannot be in the past", new[] { nameof(EventDate) }));
+                }
+            }
+
+            return results;
+        }
+    }
+
+    [Parameter]
+    public string EventName { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<string> EventNameChanged { get; set; }
+
+    [Parameter]
+    public DateTime? EventDate { get; set; }
+
+    [Parameter]
+    public EventCallback<DateTime?> EventDateChanged { get; set; }
+
+    [Parameter]
+    public string Location { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<string> LocationChanged { get; set; }
+
+    private EventModel model = new();
+    private EditContext? editContext;
+    private bool isSubmitting;
+
+    protected override void OnParametersSet()
+    {
+        model.EventName = EventName;
+        model.EventDate = EventDate;
+        model.Location = Location;
+        editContext ??= new EditContext(model);
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        isSubmitting = true;
+        StateHasChanged();
+        
+        try
+        {
+            EventName = model.EventName;
+            EventDate = model.EventDate;
+            Location = model.Location;
+            
+            await EventNameChanged.InvokeAsync(EventName);
+            await EventDateChanged.InvokeAsync(EventDate);
+            await LocationChanged.InvokeAsync(Location);
+        }
+        finally
+        {
+            isSubmitting = false;
+            StateHasChanged();
+        }
+    }
+
+    private void HandleInvalidSubmit()
+    {
+        // Prevent processing on invalid submit; UI shows field messages
+    }
+}

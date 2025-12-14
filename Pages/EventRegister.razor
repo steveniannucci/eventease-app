@@ -1,0 +1,102 @@
+@page "/events/register/{id:int}"
+@page "/events/register"
+@using System.ComponentModel.DataAnnotations
+@using EventEaseApp.Services
+@inject NavigationManager Nav
+@inject UserSessionTracker Session
+
+@if (Id > 0)
+{
+    <h1>Register for Event</h1>
+    <p>Registering for Event ID: @Id</p>
+
+    @if (submitted)
+    {
+        <div class="alert alert-success">
+            <h4>Registration Successful!</h4>
+            <p>Thank you, <strong>@model.Name</strong>! You have successfully registered for this event.</p>
+            <p>A confirmation email will be sent to <strong>@model.Email</strong>.</p>
+            <NavLink href="/events" class="btn btn-primary">Back to Events</NavLink>
+        </div>
+    }
+    else
+    {
+        <EditForm Model="model" OnValidSubmit="Submit">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="mb-3">
+                <label for="name" class="form-label">Name</label>
+                <InputText id="name" class="form-control" @bind-Value="model.Name" />
+                <ValidationMessage For="() => model.Name" />
+            </div>
+
+            <div class="mb-3">
+                <label for="email" class="form-label">Email</label>
+                <InputText id="email" class="form-control" @bind-Value="model.Email" />
+                <ValidationMessage For="() => model.Email" />
+            </div>
+
+            <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                @if (isSubmitting)
+                {
+                    <span>Submitting...</span>
+                }
+                else
+                {
+                    <span>Submit Registration</span>
+                }
+            </button>
+            <NavLink href="/events" class="btn btn-secondary ms-2">Cancel</NavLink>
+        </EditForm>
+    }
+}
+else
+{
+    <h1>Register for Event</h1>
+    <p>Please select an event from the events list to register.</p>
+    <NavLink href="/events" class="btn btn-primary">Go to Events</NavLink>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    public class RegistrationModel
+    {
+        [Required]
+        [StringLength(100)]
+        public string Name { get; set; } = string.Empty;
+
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+    }
+
+    private RegistrationModel model = new();
+    private bool submitted = false;
+    private bool isSubmitting = false;
+
+    private async Task Submit()
+    {
+        isSubmitting = true;
+        StateHasChanged();
+        
+        try
+        {
+            // Simulate API call
+            await Task.Delay(500);
+            
+            // Register with session tracker
+            Session.RegisterForEvent(Id);
+            Session.SetSessionData($"registration_{Id}", new { model.Name, model.Email, RegisteredAt = DateTime.UtcNow });
+            
+            submitted = true;
+        }
+        finally
+        {
+            isSubmitting = false;
+            StateHasChanged();
+        }
+    }
+}
